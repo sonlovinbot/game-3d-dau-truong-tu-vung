@@ -18,6 +18,18 @@ python3 -m http.server 5290
 
 Mở `http://localhost:5290`. Cần Internet để tải Three.js từ CDN.
 
+## Chạy game trên máy (một cú bấm)
+
+| Hệ điều hành | Cách chạy |
+|---|---|
+| **macOS** | Bấm đúp **`Start Word Arena.command`** (cần `python3`, nếu chưa có: `xcode-select --install`). Lần đầu nếu bị chặn: chuột phải → Open. |
+| **Windows** | Bấm đúp **`Word Arena.exe`** (không cần cài thêm gì). Nếu Windows SmartScreen cảnh báo: More info → Run anyway. |
+
+Cả hai tự chọn cổng trống (từ 5290), mở trình duyệt tại `http://localhost:5290`, tắt bộ nhớ đệm (luôn thấy bản mới khi sửa code) và không phục vụ file ẩn như `.env`. Bấm lần hai khi đang chạy chỉ mở lại trình duyệt.
+Tạo lại `Word Arena.exe` (cần [Go](https://go.dev/dl)): `bash launcher/build.sh`. File `.exe` không đưa vào git.
+
+Chạy thủ công: `python3 scripts/serve.py`, hoặc `python3 -m http.server 5290`.
+
 ## Cách chơi
 
 - 4 chủ đề (Động vật, Đồ ăn, Trường học, Gia đình) × 3 độ khó (Dễ, Trung bình, Khó), mỗi trận 10 câu.

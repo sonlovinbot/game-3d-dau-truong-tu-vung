@@ -8,3 +8,7 @@ node_modules/
 
 # trang xem trước giao diện bằng dữ liệu giả (chỉ dùng khi phát triển)
 dev/
+
+# file chạy Windows được build từ launcher/ (chạy bash launcher/build.sh để tạo lại)
+*.exe
+launcher/*.exe
