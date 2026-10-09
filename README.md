@@ -6,7 +6,7 @@ Trả lời đúng và nhanh thì nhân vật của bạn đánh trúng bot.
 
 ## Chơi online
 
-https://sonlovinbot.github.io/game-3d-dau-truong-tu-vung/ (GitHub Pages, nhánh `main`, thư mục gốc).
+https://app.danghuuson.com/game-3d-dau-truong-tu-vung/ (GitHub Pages, nhánh `main`, thư mục gốc).
 
 ## Chạy game trên máy
 
