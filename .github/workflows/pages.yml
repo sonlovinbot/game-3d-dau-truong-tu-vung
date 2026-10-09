@@ -32,7 +32,7 @@ jobs:
           mkdir _site
           rsync -a ./ _site/ \
             --exclude='/.git' --exclude='/.github' --exclude='/_site' --exclude='/dev' \
-            --exclude='/launcher' --exclude='/scripts' --exclude='/supabase' --exclude='/.env*' --exclude='/.gitignore' \
+            --exclude='/launcher' --exclude='/scripts' --exclude='/supabase' --exclude='/.env*' --exclude='/.gitignore' --exclude='/package.json' --exclude='/vercel.json' --exclude='/dist' \
             --exclude='/assets/hero.glb' --exclude='*.exe' --exclude='*.command' --exclude='README.md'
           touch _site/.nojekyll
           test -f _site/index.html && test -f _site/js/main.js && test -f _site/assets/hero.web.glb

@@ -12,3 +12,7 @@ dev/
 # file chạy Windows được build từ launcher/ (chạy bash launcher/build.sh để tạo lại)
 *.exe
 launcher/*.exe
+
+# thư mục dựng sẵn để xuất bản (Vercel tự tạo)
+dist/
+.vercel/

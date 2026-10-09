@@ -94,3 +94,14 @@ Xem trước giao diện bằng dữ liệu giả: tạo thư mục `dev/` (đã
 `.github/workflows/pages.yml` tự deploy mỗi khi đẩy lên nhánh `main` (hoặc chạy tay ở tab **Actions → Deploy to GitHub Pages → Run workflow**).
 Yêu cầu: **Settings → Pages → Source = "GitHub Actions"**. Chỉ phần game được đưa lên web (không có `supabase/`, `scripts/`, `launcher/`, `.env*`, bản GLB gốc).
 Nếu web không cập nhật: xem tab **Actions** của repo, lần chạy lỗi sẽ hiện màu đỏ kèm lý do.
+
+## Xuất bản trên Vercel
+
+1. Import repo vào Vercel, **Framework Preset: Other** (các lệnh build đã nằm sẵn trong `vercel.json`: `npm run build`, thư mục xuất bản `dist`).
+2. **Settings → Environment Variables**, thêm cho cả Production, Preview và Development:
+   - `SUPABASE_URL` = `https://xxxx.supabase.co`
+   - `SUPABASE_PUBLISHABLE_KEY` = khoá `sb_publishable_...` (không dùng `sb_secret_...`)
+3. **Deployments → ⋯ → Redeploy** (biến môi trường chỉ có hiệu lực với lần build mới).
+4. Supabase → **Authentication → URL Configuration**: thêm địa chỉ Vercel vào **Site URL** và **Redirect URLs** (`https://<tên-dự-án>.vercel.app/**`).
+
+`npm run build` sinh `dist/js/config.js` từ biến môi trường; thiếu biến thì dùng giá trị đã commit trong `js/config.js` và cảnh báo trong log. Khoá `sb_secret_...` hoặc `service_role` bị từ chối.

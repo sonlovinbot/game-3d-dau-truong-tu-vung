@@ -1,0 +1,14 @@
+{
+  "name": "word-arena",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Word Arena - Đấu trường từ vựng tiếng Anh (Three.js + Supabase)",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "config": "node scripts/make-config.mjs",
+    "seed": "node scripts/make-seed.mjs",
+    "dev": "python3 scripts/serve.py"
+  },
+  "engines": { "node": ">=18" }
+}
