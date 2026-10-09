@@ -13,7 +13,8 @@
   <script type="importmap">
     { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"
     } }
   </script>
 </head>
@@ -22,6 +23,38 @@
   <div id="floaters"></div>
   <div id="speedlines"></div>
   <div id="fxflash"></div>
+
+  <!-- Đăng nhập / đăng ký -->
+  <section id="auth" class="screen hidden">
+    <div class="panel auth-panel">
+      <div class="logo"><span class="logo-icon">⚔️</span><span>Word <b>Arena</b></span></div>
+      <p class="tagline">Đăng nhập để lưu tên và tiến độ của bạn</p>
+      <div class="tabs" role="tablist">
+        <button type="button" id="tabLogin" role="tab" aria-selected="true">Đăng nhập</button>
+        <button type="button" id="tabRegister" role="tab" aria-selected="false">Đăng ký</button>
+      </div>
+      <form id="authForm" novalidate>
+        <label id="nameRow" class="hidden">Tên người chơi
+          <input id="authName" type="text" maxlength="20" autocomplete="nickname" placeholder="Ví dụ: Sói Con">
+        </label>
+        <label>Email
+          <input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="ban@example.com">
+        </label>
+        <label>Mật khẩu
+          <input id="authPass" type="password" autocomplete="current-password" minlength="6" placeholder="Tối thiểu 6 ký tự">
+        </label>
+        <p id="authMsg" class="auth-msg" role="alert"></p>
+        <button id="authSubmit" class="btn-primary" type="submit">Đăng nhập</button>
+      </form>
+      <button id="guestBtn" class="btn-ghost" type="button">Chơi thử không cần tài khoản</button>
+    </div>
+  </section>
+
+  <div id="userChip" class="user-chip hidden">
+    <span class="avatar" aria-hidden="true">👤</span>
+    <span id="userName"></span>
+    <button id="authBtn" type="button">Đăng xuất</button>
+  </div>
 
   <!-- Menu chọn chủ đề / độ khó -->
   <section id="menu" class="screen">

@@ -3,6 +3,7 @@ import { ArenaScene } from './scene.js';
 import { TOPICS } from './words.js';
 import { Battle, LEVELS, ROUND_TIME, ROUNDS, MAX_HP } from './battle.js';
 import { sfx, speak, stopSpeaking, unlock, setMuted, isMuted } from './audio.js';
+import { initAuth, playerName } from './auth-ui.js';
 
 const $ = (s) => document.querySelector(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -203,6 +204,7 @@ async function startBattle() {
   $('#word').textContent = '…';
   $('#botName').textContent = `Bot · ${LEVELS[sel.level].label}`;
   $('#botState').textContent = '';
+  $('.fighter.left .name').textContent = playerName() || 'Bạn';
   setHP(battle);
 
   sfx.play('fanfare');
@@ -315,6 +317,7 @@ $('#muteBtn').onclick = () => {
   if (!isMuted()) sfx.click();
 };
 addEventListener('keydown', (e) => {
+  if (e.target.matches?.('input, textarea')) return; // đang gõ vào form tài khoản
   if (e.key >= '1' && e.key <= '4') answerNow?.(Number(e.key) - 1);
   else if (e.key === 'Enter' && !$('#menu').classList.contains('hidden')) startBattle();
 });
@@ -353,3 +356,4 @@ addEventListener('drop', (e) => {
 addEventListener('pointerdown', unlock, { once: true });
 buildMenu();
 arena.setMode('menu');
+initAuth(() => {}); // tài khoản: không có cấu hình Supabase thì bỏ qua
