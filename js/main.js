@@ -1,9 +1,11 @@
 // Điều phối: menu → trận đấu → kết quả. Nối logic (battle.js), cảnh 3D (scene.js), âm thanh và giao diện.
 import { ArenaScene } from './scene.js';
 import { TOPICS } from './words.js';
-import { Battle, LEVELS, ROUND_TIME, ROUNDS, MAX_HP } from './battle.js';
+import { LEVELS, ROUND_TIME, MAX_HP } from './battle.js';
+import { LocalSession, OnlineSession, describeError, ACHIEVEMENTS } from './session.js';
 import { sfx, speak, stopSpeaking, unlock, setMuted, isMuted } from './audio.js';
-import { initAuth, playerName, playerAvatar, onProfile } from './auth-ui.js';
+import { initAuth, playerName, playerAvatar, onProfile, isLoggedIn } from './auth-ui.js';
+import { configured } from './auth.js';
 import { initSettings, loadLocalPrefs } from './settings.js';
 import { applyPrefs } from './audio.js';
 
@@ -15,13 +17,12 @@ const HERO_URLS = params.get('hero') ? [params.get('hero')] : ['assets/hero.web.
 const HERO_ROT = Number(params.get('heroRot')) || 0; // xoay thêm (độ) nếu model GLB nhìn lệch hướng
 
 const arena = new ArenaScene($('#stage'), $('#floaters'));
-const CRIT_TIME = 1.6; // trả lời đúng trong ngần này giây thì đòn đánh thành chí mạng
 window.__arena = arena; // tay nắm để gỡ lỗi trong console
 const sel = { topic: TOPICS[0].id, level: 'easy' };
 
 let runId = 0; // tăng mỗi lần bắt đầu/thoát trận để các vòng lặp bất đồng bộ cũ tự dừng
 let answerNow = null; // hàm nhận đáp án khi đang chờ người chơi
-let lastBattle = null;
+let session = null; // phiên chơi hiện tại (OnlineSession hoặc LocalSession)
 
 /* ---------------- tiện ích giao diện ---------------- */
 function toast(msg, ms = 2600) {
@@ -42,13 +43,12 @@ function banner(text, cls = '', ms = 900) {
   return sleep(ms);
 }
 
-function setHP(battle) {
-  for (const [key, id] of [['hero', 'hero'], ['bot', 'bot']]) {
-    const hp = battle.hp[key];
-    const bar = $(`#hp${id === 'hero' ? 'Hero' : 'Bot'}`);
-    bar.style.transform = `scaleX(${hp / MAX_HP})`;
-    bar.classList.toggle('low', hp / MAX_HP < 0.35);
-    $(`#hp${id === 'hero' ? 'Hero' : 'Bot'}Text`).textContent = hp;
+function setHP(hp) {
+  for (const [key, id] of [['hero', 'Hero'], ['bot', 'Bot']]) {
+    const bar = $(`#hp${id}`);
+    bar.style.transform = `scaleX(${hp[key] / MAX_HP})`;
+    bar.classList.toggle('low', hp[key] / MAX_HP < 0.35);
+    $(`#hp${id}Text`).textContent = hp[key];
   }
 }
 
@@ -94,6 +94,8 @@ function refreshMenu() {
 function showMenu() {
   runId++;
   answerNow?.(-2);
+  session?.abandon(); // báo server đóng trận đang chơi dở
+  session = null;
   stopSpeaking();
   document.body.classList.remove('battle');
   $('#hud').classList.add('hidden');
@@ -109,7 +111,7 @@ function showMenu() {
 /* ---------------- trận đấu ---------------- */
 function renderQuestion(q, r, total) {
   $('#roundNo').textContent = `${r + 1}/${total}`;
-  $('#word').textContent = q.word.en;
+  $('#word').textContent = q.word;
   const card = $('#wordCard');
   card.classList.remove('pop');
   void card.offsetWidth;
@@ -122,8 +124,10 @@ function renderQuestion(q, r, total) {
     b.className = `ans a${i}`;
     const k = document.createElement('kbd');
     k.textContent = i + 1;
-    b.append(k, document.createTextNode(text));
-    b.onclick = () => answerNow?.(i);
+    const label = document.createElement('span');
+    label.textContent = text;
+    b.append(k, label);
+    b.onclick = () => choose(i);
     box.append(b);
   });
   $('#timerBar').style.transform = 'scaleX(1)';
@@ -134,8 +138,15 @@ function renderQuestion(q, r, total) {
   bs.classList.remove('done');
 }
 
+/** Người chơi chọn đáp án i (chuột, chạm hoặc phím 1–4). */
+function choose(i) {
+  if (!answerNow) return;
+  $('#answers').children[i]?.classList.add('picked');
+  answerNow(i);
+}
+
 /** Chờ người chơi chọn đáp án hoặc hết giờ. Trả { idx, time }. idx = -1: hết giờ, -2: bị huỷ. */
-function askPlayer(plan) {
+function askPlayer(botSec) {
   return new Promise((resolve) => {
     const t0 = performance.now();
     const bar = $('#timerBar');
@@ -164,7 +175,7 @@ function askPlayer(plan) {
         if (sec <= 2 && sec > 0) sfx.tick();
       }
       timer.classList.toggle('urgent', left <= 2);
-      if (el >= plan.time && plan.time < ROUND_TIME) {
+      if (el >= botSec && botSec < ROUND_TIME) {
         const bs = $('#botState');
         bs.textContent = 'Bot đã trả lời!';
         bs.classList.add('done');
@@ -176,13 +187,30 @@ function askPlayer(plan) {
   });
 }
 
-function revealAnswers(q, idx) {
+function revealAnswers(correctIndex, idx) {
   [...$('#answers').children].forEach((b, i) => {
     b.disabled = true;
-    if (i === q.correctIndex) b.classList.add('correct');
+    if (i === correctIndex) b.classList.add('correct');
     else if (i === idx) b.classList.add('wrong');
     else b.classList.add('dim');
   });
+}
+
+/** Người đã đăng nhập chơi online (server chấm điểm); khách hoặc khi máy chủ chưa sẵn sàng thì chơi thử. */
+async function createSession() {
+  if (configured && isLoggedIn()) {
+    const s = new OnlineSession(sel.topic, sel.level);
+    try {
+      await s.start();
+      return s;
+    } catch (err) {
+      const d = describeError(err);
+      console.warn('[online]', err);
+      if (d.kind === 'rate' || d.kind === 'auth') throw Object.assign(new Error(d.text), { fatal: true });
+      toast(`${d.text} Đang chơi ở chế độ thử, điểm sẽ không được lưu.`, 5000);
+    }
+  }
+  return new LocalSession(sel.topic, sel.level);
 }
 
 async function startBattle() {
@@ -190,9 +218,24 @@ async function startBattle() {
   const alive = () => id === runId;
   unlock();
   sfx.click();
+  session?.abandon();
+  session = null;
+  $('#startBtn').disabled = $('#againBtn').disabled = true;
 
-  const battle = new Battle(sel.topic, sel.level);
-  lastBattle = battle;
+  let s;
+  try {
+    s = await createSession();
+  } catch (err) {
+    $('#startBtn').disabled = $('#againBtn').disabled = false;
+    toast(err.message, 4500);
+    return showMenu();
+  }
+  $('#startBtn').disabled = $('#againBtn').disabled = false;
+  if (!alive()) return s.abandon();
+  session = s;
+
+  const hp = { hero: MAX_HP, bot: MAX_HP };
+  const missed = [];
   arena.setTheme(sel.topic);
   arena.setBotLevel(sel.level);
   arena.resetPoses();
@@ -207,34 +250,62 @@ async function startBattle() {
   $('#botName').textContent = `Bot · ${LEVELS[sel.level].label}`;
   $('#botState').textContent = '';
   $('.fighter.left .name').textContent = playerName() ? `${playerAvatar()} ${playerName()}` : 'Bạn';
-  setHP(battle);
+  setHP(hp);
 
   sfx.play('fanfare');
   await banner('Sẵn sàng!', 1000);
   if (!alive()) return;
 
-  const total = battle.questions.length;
-  for (let r = 0; r < total; r++) {
-    const q = battle.questions[r];
-    const plan = battle.plan();
-    renderQuestion(q, r, total);
-    sfx.play('next');
-    speak(q.word.en);
+  const fail = (err) => {
+    const d = describeError(err);
+    console.error('[online]', err);
+    toast(d.text, 5000);
+    showMenu();
+  };
 
-    const { idx, time } = await askPlayer(plan);
+  let summary = null;
+  let ko = false;
+  for (let r = 0; r < s.total; r++) {
+    let q;
+    try {
+      $('#botState').textContent = 'Đang tải câu hỏi…';
+      q = await s.question(r);
+    } catch (err) {
+      return alive() && fail(err);
+    }
+    if (!alive()) return;
+    renderQuestion(q, r, s.total);
+    sfx.play('next');
+    speak(q.word);
+
+    const { idx, time } = await askPlayer(q.botSec);
+    if (!alive() || idx === -2) return;
+    [...$('#answers').children].forEach((b) => (b.disabled = true)); // khoá nút trong lúc server chấm
+
+    let res;
+    try {
+      res = await s.answer(r, idx, time);
+    } catch (err) {
+      return alive() && fail(err);
+    }
     if (!alive()) return;
 
-    const res = battle.resolve(q, idx, time, plan);
-    revealAnswers(q, idx);
-    if (res.playerCorrect) sfx.correct();
+    revealAnswers(res.correctIndex, idx);
+    if (!res.isCorrect) missed.push({ en: q.word, vi: q.options[res.correctIndex] });
+    if (res.isCorrect) sfx.correct();
     else sfx.wrong();
-    arena.feedback(res.playerCorrect);
+    arena.feedback(res.isCorrect);
 
-    const msg = res.timedOut ? 'Hết giờ!' : res.playerCorrect ? (res.winner === 'hero' ? 'Chính xác!' : 'Đúng, nhưng Bot nhanh hơn!') : 'Sai rồi!';
-    banner(msg, res.playerCorrect ? 'good' : 'bad', 800);
+    const msg = res.timedOut ? 'Hết giờ!' : res.isCorrect ? (res.winner === 'hero' ? 'Chính xác!' : 'Đúng, nhưng Bot nhanh hơn!') : 'Sai rồi!';
+    banner(msg, res.isCorrect ? 'good' : 'bad', 800);
     await sleep(750);
     if (!alive()) return;
 
+    const onImpact = () => {
+      hp.hero = res.heroHp;
+      hp.bot = res.botHp;
+      setHP(hp);
+    };
     if (res.winner === 'hero') {
       if (res.combo) {
         arena.floatAbove('hero', `Combo x${res.combo + 1}!`, 'combo');
@@ -242,48 +313,73 @@ async function startBattle() {
       }
       await arena.attack('hero', 'bot', {
         text: `-${res.damage}`,
-        onImpact: () => setHP(battle),
-        crit: time <= CRIT_TIME, // trả lời cực nhanh
+        onImpact,
+        crit: res.crit, // trả lời cực nhanh
         super: res.combo >= 2, // chuỗi đúng liên tiếp → đòn tối thượng
-        ko: battle.hp.bot === 0,
+        ko: res.botHp === 0,
       });
     } else if (res.winner === 'bot') {
-      await arena.attack('bot', 'hero', { text: `-${res.damage}`, onImpact: () => setHP(battle), ko: battle.hp.hero === 0 });
+      await arena.attack('bot', 'hero', { text: `-${res.damage}`, onImpact, ko: res.heroHp === 0 });
     } else {
       await arena.miss('Cả hai đều hụt!');
     }
     if (!alive()) return;
-    if (battle.isOver()) break;
+    if (res.finished) {
+      summary = res.summary;
+      ko = res.botHp === 0 || res.heroHp === 0;
+      break;
+    }
   }
 
-  await finishBattle(battle, alive);
+  await finishBattle(summary, missed, s.online, ko, alive);
 }
 
-async function finishBattle(battle, alive) {
-  const outcome = battle.outcome();
+async function finishBattle(sum, missed, online, ko, alive) {
+  const outcome = sum.outcome;
   $('#hud').classList.add('hidden');
   document.body.classList.remove('battle');
   stopSpeaking();
   arena.finish(outcome === 'win' ? 'hero' : outcome === 'lose' ? 'bot' : 'draw');
   sfx.play(outcome === 'win' ? 'win' : outcome === 'lose' ? 'lose' : 'draw');
-  const ko = battle.hp.bot === 0 || battle.hp.hero === 0;
   await banner(outcome === 'win' ? (ko ? 'K.O.! Bạn thắng!' : 'Chiến thắng!') : outcome === 'lose' ? (ko ? 'K.O.! Bạn thua' : 'Bạn thua rồi') : 'Hoà nhau!', outcome === 'win' ? 'gold' : outcome === 'lose' ? 'bad' : '', 1800);
   if (!alive()) return;
-  showResult(battle, outcome);
+  showResult(sum, missed, online);
 }
 
-function showResult(battle, outcome) {
-  $('#resultTitle').textContent = outcome === 'win' ? '🏆 Chiến thắng!' : outcome === 'lose' ? '💪 Cố lên nào!' : '🤝 Hoà nhau!';
-  $('#resultStars').innerHTML = [0, 1, 2].map((i) => `<span class="${i < battle.stars ? '' : 'off'}">⭐</span>`).join('');
-  $('#resultStats').innerHTML = `
-    <div class="stat"><b>${battle.correct}/${battle.round}</b><span>Trả lời đúng</span></div>
-    <div class="stat"><b>${Math.round(battle.accuracy * 100)}%</b><span>Chính xác</span></div>
-    <div class="stat"><b>${battle.hp.hero}</b><span>HP còn lại</span></div>`;
+function showResult(sum, missed, online) {
+  const stat = (value, label) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+  $('#resultTitle').textContent = sum.outcome === 'win' ? '🏆 Chiến thắng!' : sum.outcome === 'lose' ? '💪 Cố lên nào!' : '🤝 Hoà nhau!';
+  $('#resultStars').innerHTML = [0, 1, 2].map((i) => `<span class="${i < sum.stars ? '' : 'off'}">⭐</span>`).join('');
+  $('#resultStats').innerHTML =
+    (online ? stat(sum.score, 'Điểm') : '') +
+    stat(`${sum.correct}/${sum.rounds}`, 'Trả lời đúng') +
+    stat(`${sum.rounds ? Math.round((sum.correct / sum.rounds) * 100) : 0}%`, 'Chính xác') +
+    stat(sum.heroHp, 'HP còn lại');
+
+  // dòng phụ: XP/cấp độ + huy hiệu mới (online), hoặc lời nhắc đăng nhập (chơi thử)
+  const extra = $('#resultExtra');
+  extra.replaceChildren();
+  const line = (text, cls = '') => {
+    const p = document.createElement('p');
+    p.className = cls;
+    p.textContent = text;
+    extra.append(p);
+  };
+  if (online) {
+    line(`+${sum.xpGained} XP · Cấp ${sum.level}`, 'xp');
+    for (const code of sum.newAchievements) {
+      const a = ACHIEVEMENTS[code];
+      if (a) line(`${a.icon} Huy hiệu mới: ${a.name}`, 'badge-new');
+    }
+  } else {
+    line(isLoggedIn() ? 'Chế độ thử: máy chủ chưa sẵn sàng nên điểm không được lưu.' : 'Đăng nhập để lưu điểm, tiến độ và lên bảng xếp hạng.', 'hint');
+  }
+
   const box = $('#missedBox');
   const list = $('#missedList');
   list.innerHTML = '';
-  box.classList.toggle('hidden', battle.missed.length === 0);
-  for (const w of battle.missed) {
+  box.classList.toggle('hidden', missed.length === 0);
+  for (const w of missed) {
     const li = document.createElement('li');
     const b = document.createElement('b');
     b.textContent = w.en;
@@ -297,8 +393,8 @@ function showResult(battle, outcome) {
     list.append(li);
   }
   $('#result').classList.remove('hidden');
-  for (let i = 0; i < battle.stars; i++) setTimeout(() => sfx.play('star', { rate: 1 + i * 0.12 }), 500 + i * 380);
-  if (battle.stars === 3) setTimeout(() => sfx.play('perfect'), 500 + 3 * 380);
+  for (let i = 0; i < sum.stars; i++) setTimeout(() => sfx.play('star', { rate: 1 + i * 0.12 }), 500 + i * 380);
+  if (sum.stars === 3) setTimeout(() => sfx.play('perfect'), 500 + 3 * 380);
 }
 
 /* ---------------- sự kiện ---------------- */
@@ -320,7 +416,7 @@ $('#muteBtn').onclick = () => {
 };
 addEventListener('keydown', (e) => {
   if (e.target.matches?.('input, textarea')) return; // đang gõ vào form tài khoản
-  if (e.key >= '1' && e.key <= '4') answerNow?.(Number(e.key) - 1);
+  if (e.key >= '1' && e.key <= '4') choose(Number(e.key) - 1);
   else if (e.key === 'Enter' && !$('#menu').classList.contains('hidden')) startBattle();
 });
 

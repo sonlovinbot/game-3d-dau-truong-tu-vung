@@ -70,3 +70,9 @@ Sau khi sửa `js/words.js`, chạy `node scripts/make-seed.mjs` và chạy lạ
 Bấm **⚙️ Cài đặt** ở góc màn hình (khi đã đăng nhập): đổi tên và avatar, đổi mật khẩu, bật/tắt hiệu ứng và nhạc nền,
 xem điểm số, tiến độ học từng từ, huy hiệu, bảng xếp hạng và xoá tài khoản.
 Xem trước giao diện bằng dữ liệu giả: tạo thư mục `dev/` (đã được `.gitignore`) rồi mở `dev/settings-preview.html`.
+
+## Chơi online và chơi thử
+
+- **Đã đăng nhập:** trận đấu chạy trên server (`js/session.js` → `OnlineSession`). Server chọn câu hỏi, đo giờ, chấm đúng/sai, tính điểm, lưu thống kê, tiến độ từng từ và huy hiệu.
+- **Khách ("Chơi thử"):** tính hoàn toàn trong trình duyệt (`LocalSession`), không lưu gì. Người đã đăng nhập nhưng máy chủ chưa cài SQL cũng tự chuyển sang chế độ này và có thông báo.
+- Chữ giao diện dùng **Be Vietnam Pro** (nội dung) và **Baloo 2** (tiêu đề), cả hai có đủ dấu tiếng Việt.
