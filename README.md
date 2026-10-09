@@ -88,3 +88,9 @@ Xem trước giao diện bằng dữ liệu giả: tạo thư mục `dev/` (đã
 - **Đã đăng nhập:** trận đấu chạy trên server (`js/session.js` → `OnlineSession`). Server chọn câu hỏi, đo giờ, chấm đúng/sai, tính điểm, lưu thống kê, tiến độ từng từ và huy hiệu.
 - **Khách ("Chơi thử"):** tính hoàn toàn trong trình duyệt (`LocalSession`), không lưu gì. Người đã đăng nhập nhưng máy chủ chưa cài SQL cũng tự chuyển sang chế độ này và có thông báo.
 - Chữ giao diện dùng **Be Vietnam Pro** (nội dung) và **Baloo 2** (tiêu đề), cả hai có đủ dấu tiếng Việt.
+
+## Xuất bản (GitHub Pages)
+
+`.github/workflows/pages.yml` tự deploy mỗi khi đẩy lên nhánh `main` (hoặc chạy tay ở tab **Actions → Deploy to GitHub Pages → Run workflow**).
+Yêu cầu: **Settings → Pages → Source = "GitHub Actions"**. Chỉ phần game được đưa lên web (không có `supabase/`, `scripts/`, `launcher/`, `.env*`, bản GLB gốc).
+Nếu web không cập nhật: xem tab **Actions** của repo, lần chạy lỗi sẽ hiện màu đỏ kèm lý do.
