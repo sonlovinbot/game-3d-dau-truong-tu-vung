@@ -5,3 +5,6 @@ node_modules/
 
 # khoá/cấu hình cục bộ
 .env
+
+# trang xem trước giao diện bằng dữ liệu giả (chỉ dùng khi phát triển)
+dev/

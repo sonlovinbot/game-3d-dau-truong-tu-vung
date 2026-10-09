@@ -71,6 +71,12 @@ export async function updatePassword(password) {
   if (error) throw error;
 }
 
+/** Đồng bộ tên hiển thị vào thông tin tài khoản (để hiện đúng ở mọi nơi). */
+export async function updateMetadata(data) {
+  const { error } = await supabase.auth.updateUser({ data });
+  if (error) throw error;
+}
+
 /** Người dùng hiện tại (đọc từ phiên đã lưu), hoặc null. */
 export async function currentUser() {
   const { data } = await supabase.auth.getSession();

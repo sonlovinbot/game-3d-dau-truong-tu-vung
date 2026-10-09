@@ -36,7 +36,9 @@ const MUSIC_VOL = 0.14;
 
 let ctx = null;
 let master = null;
-let muted = false;
+let muted = false; // nút 🔊: tắt tất cả
+let sfxOn = true; // cài đặt: hiệu ứng + giọng đọc
+let musicOn = true; // cài đặt: nhạc nền
 const bufs = {}; // file → AudioBuffer
 
 function context() {
@@ -72,7 +74,7 @@ async function load(file) {
  * until = số giây nữa tới lúc trúng đòn: âm thanh sẽ được căn để "cú đập" (lead) rơi đúng lúc đó.
  */
 function play(name, opts = {}) {
-  if (muted) return;
+  if (muted || !sfxOn) return;
   const d = DEFS[name];
   const c = ctx;
   const buf = d && bufs[d.f];
@@ -111,6 +113,7 @@ export const sfx = {
 };
 
 /* ---------------- nhạc nền ---------------- */
+const musicLevel = () => (muted || !musicOn ? 0 : MUSIC_VOL);
 let wantMusic = false;
 let musicGain = null;
 let musicSrc = null;
@@ -121,7 +124,7 @@ export const music = {
     const buf = bufs[MUSIC_FILE];
     if (!buf || !ctx || musicSrc) return;
     musicGain = ctx.createGain();
-    musicGain.gain.value = muted ? 0 : MUSIC_VOL;
+    musicGain.gain.value = musicLevel();
     musicSrc = ctx.createBufferSource();
     musicSrc.buffer = buf;
     musicSrc.loop = true;
@@ -130,7 +133,7 @@ export const music = {
   },
   /** Hạ nhạc nền xuống trong lúc đọc từ để nghe rõ phát âm. */
   duck(seconds = 1.6) {
-    if (!musicGain || muted) return;
+    if (!musicGain || musicLevel() === 0) return;
     const t = ctx.currentTime;
     musicGain.gain.cancelScheduledValues(t);
     musicGain.gain.setTargetAtTime(MUSIC_VOL * 0.3, t, 0.08);
@@ -156,7 +159,7 @@ if (canSpeak) {
 }
 
 export function speak(text) {
-  if (muted || !canSpeak) return;
+  if (muted || !sfxOn || !canSpeak) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
@@ -182,6 +185,14 @@ export function unlock() {
 export function setMuted(v) {
   muted = v;
   if (v) stopSpeaking();
-  if (musicGain) musicGain.gain.value = v ? 0 : MUSIC_VOL;
+  if (musicGain) musicGain.gain.value = musicLevel();
 }
 export const isMuted = () => muted;
+
+/** Cài đặt của người chơi: { sfx: bật hiệu ứng + giọng đọc, music: bật nhạc nền }. Thiếu khoá thì giữ bật. */
+export function applyPrefs(prefs = {}) {
+  sfxOn = prefs.sfx !== false;
+  musicOn = prefs.music !== false;
+  if (!sfxOn) stopSpeaking();
+  if (musicGain) musicGain.gain.value = musicLevel();
+}

@@ -3,7 +3,9 @@ import { ArenaScene } from './scene.js';
 import { TOPICS } from './words.js';
 import { Battle, LEVELS, ROUND_TIME, ROUNDS, MAX_HP } from './battle.js';
 import { sfx, speak, stopSpeaking, unlock, setMuted, isMuted } from './audio.js';
-import { initAuth, playerName } from './auth-ui.js';
+import { initAuth, playerName, playerAvatar, onProfile } from './auth-ui.js';
+import { initSettings, loadLocalPrefs } from './settings.js';
+import { applyPrefs } from './audio.js';
 
 const $ = (s) => document.querySelector(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -204,7 +206,7 @@ async function startBattle() {
   $('#word').textContent = '…';
   $('#botName').textContent = `Bot · ${LEVELS[sel.level].label}`;
   $('#botState').textContent = '';
-  $('.fighter.left .name').textContent = playerName() || 'Bạn';
+  $('.fighter.left .name').textContent = playerName() ? `${playerAvatar()} ${playerName()}` : 'Bạn';
   setHP(battle);
 
   sfx.play('fanfare');
@@ -356,4 +358,7 @@ addEventListener('drop', (e) => {
 addEventListener('pointerdown', unlock, { once: true });
 buildMenu();
 arena.setMode('menu');
+applyPrefs(loadLocalPrefs()); // cài đặt âm thanh đã lưu trên máy này
+onProfile((p) => p?.preferences && applyPrefs(p.preferences)); // đăng nhập thì dùng cài đặt của tài khoản
+initSettings();
 initAuth(() => {}); // tài khoản: không có cấu hình Supabase thì bỏ qua

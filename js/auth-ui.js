@@ -3,6 +3,7 @@ import {
   configured, signUp, signIn, signOut, resetPassword, updatePassword,
   currentUser, onAuthChange, displayName, friendlyError,
 } from './auth.js';
+import { getProfile } from './data.js';
 
 const $ = (s) => document.querySelector(s);
 const GUEST_KEY = 'wa_guest';
@@ -35,10 +36,47 @@ const MODES = {
 let mode = 'login';
 let user = null;
 let recovering = false; // đang ở màn "đặt mật khẩu mới" sau khi bấm link trong email
+let profile = null; // { display_name, avatar, preferences } đọc từ bảng profiles
+const profileListeners = [];
 
-/** Tên đang hiển thị trong game ('' nếu là khách). */
-export const playerName = () => (user ? displayName(user) : '');
+/** Tên đang hiển thị trong game ('' nếu là khách). Ưu tiên tên trong hồ sơ, không có thì lấy từ tài khoản. */
+export const playerName = () => (user ? profile?.display_name || displayName(user) : '');
+export const playerAvatar = () => (user ? profile?.avatar || '🙂' : '👤');
 export const isLoggedIn = () => Boolean(user);
+export const getUser = () => user;
+export const getCurrentProfile = () => profile;
+/** Gọi cb(profile | null) mỗi khi hồ sơ được tải hoặc thay đổi (để áp dụng cài đặt âm thanh...). */
+export const onProfile = (cb) => profileListeners.push(cb);
+
+/** Cập nhật hồ sơ đang giữ trong bộ nhớ (sau khi lưu ở trang Cài đặt) và vẽ lại góc màn hình. */
+export function setProfile(p) {
+  profile = p;
+  renderChip();
+  profileListeners.forEach((f) => f(profile));
+}
+
+async function loadProfile() {
+  if (!user) return setProfile(null);
+  try {
+    profile = await getProfile(user.id);
+  } catch (err) {
+    console.warn('[profile]', err);
+    profile = null;
+  }
+  setProfile(profile);
+}
+
+/** Đăng xuất rồi quay về màn đăng nhập. */
+export async function logout() {
+  try {
+    await signOut();
+  } catch (err) {
+    console.error('[auth]', err);
+  }
+  store.set(false);
+  profile = null;
+  openAuth('login');
+}
 
 function setMode(m, keepMsg = false) {
   mode = m;
@@ -84,23 +122,12 @@ function closeAuth() {
 
 function renderChip() {
   $('#userChip').classList.remove('hidden');
-  $('#userName').textContent = user ? displayName(user) : 'Khách';
+  $('#userChip .avatar').textContent = playerAvatar();
+  $('#userName').textContent = user ? playerName() : 'Khách';
   $('#userName').title = user?.email || '';
   const btn = $('#authBtn');
-  btn.textContent = user ? 'Đăng xuất' : 'Đăng nhập';
-  btn.onclick = async () => {
-    if (user) {
-      btn.disabled = true;
-      try {
-        await signOut();
-      } catch (err) {
-        console.error('[auth]', err);
-      }
-      btn.disabled = false;
-      store.set(false);
-    }
-    openAuth('login');
-  };
+  btn.textContent = user ? '⚙️ Cài đặt' : 'Đăng nhập';
+  btn.onclick = () => (user ? window.dispatchEvent(new Event('wa:open-settings')) : openAuth('login'));
 }
 
 /** Xoá token/mã khỏi thanh địa chỉ sau khi đã dùng xong. */
@@ -198,6 +225,7 @@ export async function initAuth(onChange = () => {}) {
     const was = user;
     user = u;
     renderChip();
+    if (u?.id !== was?.id) setTimeout(loadProfile, 0); // không gọi Supabase ngay trong callback
     if (event === 'PASSWORD_RECOVERY') {
       recovering = true;
       openAuth('recover');
@@ -211,6 +239,7 @@ export async function initAuth(onChange = () => {}) {
 
   user = await currentUser(); // đọc phiên đã lưu → tải lại trang vẫn đăng nhập
   renderChip();
+  loadProfile();
   if (recovering) openAuth('recover');
   else if (link.error) openAuth('login', { text: link.error, kind: 'error' });
   else if (!user && !store.get()) openAuth('login');

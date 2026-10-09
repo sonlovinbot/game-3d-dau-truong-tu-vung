@@ -58,9 +58,15 @@ Các file trong `game sound/` lấy từ [Mixkit](https://mixkit.co/license/#sfx
 ## Tài khoản và dữ liệu (Supabase)
 
 1. Điền `.env` (xem `.env.example`) rồi chạy `node scripts/make-config.mjs` để sinh `js/config.js`.
-2. Trong Supabase → **SQL Editor**, chạy lần lượt `supabase/schema.sql` rồi `supabase/seed_words.sql`.
+2. Trong Supabase → **SQL Editor**, chạy lần lượt `supabase/schema.sql`, `supabase/seed_words.sql` rồi `supabase/02_settings.sql` (avatar, tóm tắt tiến độ, xoá tài khoản).
 3. Supabase → **Authentication → URL Configuration**: thêm `http://localhost:5290` và địa chỉ GitHub Pages vào **Redirect URLs**.
 
 `schema.sql` tạo các bảng hồ sơ, thống kê, trận đấu, tiến độ từng từ, huy hiệu và các hàm chấm điểm chạy trên server
 (`start_match` → `fetch_question` → `submit_answer`). Trình duyệt chỉ đọc được dữ liệu của chính mình và không ghi trực tiếp được vào bảng điểm.
 Sau khi sửa `js/words.js`, chạy `node scripts/make-seed.mjs` và chạy lại `seed_words.sql`.
+
+## Trang Cài đặt
+
+Bấm **⚙️ Cài đặt** ở góc màn hình (khi đã đăng nhập): đổi tên và avatar, đổi mật khẩu, bật/tắt hiệu ứng và nhạc nền,
+xem điểm số, tiến độ học từng từ, huy hiệu, bảng xếp hạng và xoá tài khoản.
+Xem trước giao diện bằng dữ liệu giả: tạo thư mục `dev/` (đã được `.gitignore`) rồi mở `dev/settings-preview.html`.
