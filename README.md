@@ -4,7 +4,11 @@ Game 3D học từ vựng tiếng Anh cho học sinh K12, viết bằng Three.js
 Chọn chủ đề và độ khó, đấu với bot: nghe phát âm một từ tiếng Anh rồi chọn nghĩa đúng trong **5 giây**.
 Trả lời đúng và nhanh thì nhân vật của bạn đánh trúng bot.
 
-## Chạy game
+## Chơi online
+
+https://sonlovinbot.github.io/game-3d-dau-truong-tu-vung/ (GitHub Pages, nhánh `main`, thư mục gốc).
+
+## Chạy game trên máy
 
 Cần chạy qua một web server tĩnh (trình duyệt chặn ES module và file GLB khi mở trực tiếp bằng `file://`):
 
