@@ -23,6 +23,8 @@ const ERRORS = [
   [/rate limit|over_email_send_rate_limit|too many/i, 'Thao tác quá nhiều lần. Hãy đợi một lúc rồi thử lại.'],
   [/unable to validate email|invalid.*email/i, 'Địa chỉ email không hợp lệ.'],
   [/signups? (not allowed|are disabled)/i, 'Hiện chưa mở đăng ký tài khoản mới.'],
+  [/new password should be different/i, 'Mật khẩu mới phải khác mật khẩu cũ.'],
+  [/session missing|jwt expired|otp_expired|expired|invalid.*(token|link)/i, 'Link đã hết hạn hoặc không còn hiệu lực. Hãy yêu cầu gửi lại.'],
   [/failed to fetch|network/i, 'Không kết nối được máy chủ. Hãy kiểm tra mạng.'],
 ];
 export const friendlyError = (err) => ERRORS.find(([re]) => re.test(err?.message || ''))?.[1] || `Có lỗi xảy ra: ${err?.message || 'không rõ'}`;
@@ -57,13 +59,25 @@ export async function signOut() {
   if (error) throw error;
 }
 
+/** Gửi email đặt lại mật khẩu. Link trong email đưa người chơi quay lại trang game. */
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: pageUrl() });
+  if (error) throw error;
+}
+
+/** Đặt mật khẩu mới (dùng sau khi bấm link trong email, hoặc khi đã đăng nhập). */
+export async function updatePassword(password) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 /** Người dùng hiện tại (đọc từ phiên đã lưu), hoặc null. */
 export async function currentUser() {
   const { data } = await supabase.auth.getSession();
   return data.session?.user ?? null;
 }
 
-/** Gọi cb(user | null) lúc khởi động và mỗi khi đăng nhập/đăng xuất. */
+/** Gọi cb(user | null, event) lúc khởi động và mỗi khi đăng nhập/đăng xuất/bấm link đặt lại mật khẩu. */
 export function onAuthChange(cb) {
-  supabase.auth.onAuthStateChange((_event, session) => cb(session?.user ?? null));
+  supabase.auth.onAuthStateChange((event, session) => cb(session?.user ?? null, event));
 }

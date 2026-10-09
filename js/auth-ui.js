@@ -1,5 +1,8 @@
-// Giao diện tài khoản: màn đăng nhập/đăng ký, chip tên người chơi ở góc màn hình.
-import { configured, signUp, signIn, signOut, currentUser, onAuthChange, displayName, friendlyError } from './auth.js';
+// Giao diện tài khoản: đăng nhập, đăng ký, quên mật khẩu, đặt mật khẩu mới, chip tên người chơi ở góc màn hình.
+import {
+  configured, signUp, signIn, signOut, resetPassword, updatePassword,
+  currentUser, onAuthChange, displayName, friendlyError,
+} from './auth.js';
 
 const $ = (s) => document.querySelector(s);
 const GUEST_KEY = 'wa_guest';
@@ -21,23 +24,37 @@ const store = {
   },
 };
 
-let mode = 'login'; // 'login' | 'register'
+// Mỗi chế độ: tiêu đề phụ, chữ trên nút, các ô hiện ra, và các nút phụ.
+const MODES = {
+  login: { tagline: 'Đăng nhập để lưu tên và tiến độ của bạn', submit: 'Đăng nhập', fields: ['email', 'pass'], tabs: true, forgot: true, guest: true, passLabel: 'Mật khẩu' },
+  register: { tagline: 'Tạo tài khoản miễn phí', submit: 'Tạo tài khoản', fields: ['name', 'email', 'pass'], tabs: true, guest: true, passLabel: 'Mật khẩu' },
+  forgot: { tagline: 'Nhập email, chúng tôi sẽ gửi link để đặt lại mật khẩu', submit: 'Gửi link đặt lại mật khẩu', fields: ['email'], back: true },
+  recover: { tagline: 'Đặt mật khẩu mới cho tài khoản của bạn', submit: 'Lưu mật khẩu mới', fields: ['pass', 'pass2'], passLabel: 'Mật khẩu mới' },
+};
+
+let mode = 'login';
 let user = null;
-let listener = () => {};
+let recovering = false; // đang ở màn "đặt mật khẩu mới" sau khi bấm link trong email
 
 /** Tên đang hiển thị trong game ('' nếu là khách). */
 export const playerName = () => (user ? displayName(user) : '');
 export const isLoggedIn = () => Boolean(user);
 
-function setMode(m) {
+function setMode(m, keepMsg = false) {
   mode = m;
-  const reg = m === 'register';
-  $('#tabLogin').setAttribute('aria-selected', String(!reg));
-  $('#tabRegister').setAttribute('aria-selected', String(reg));
-  $('#nameRow').classList.toggle('hidden', !reg);
-  $('#authPass').autocomplete = reg ? 'new-password' : 'current-password';
-  $('#authSubmit').textContent = reg ? 'Tạo tài khoản' : 'Đăng nhập';
-  showMsg('');
+  const cfg = MODES[m];
+  $('.auth-panel .tagline').textContent = cfg.tagline;
+  $('#authSubmit').textContent = cfg.submit;
+  document.querySelectorAll('#authForm [data-field]').forEach((el) => el.classList.toggle('hidden', !cfg.fields.includes(el.dataset.field)));
+  $('.tabs').classList.toggle('hidden', !cfg.tabs);
+  $('#tabLogin').setAttribute('aria-selected', String(m === 'login'));
+  $('#tabRegister').setAttribute('aria-selected', String(m === 'register'));
+  $('#forgotLink').classList.toggle('hidden', !cfg.forgot);
+  $('#backLink').classList.toggle('hidden', !cfg.back);
+  $('#guestBtn').classList.toggle('hidden', !cfg.guest);
+  if (cfg.passLabel) $('#passLabel').textContent = cfg.passLabel;
+  $('#authPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+  if (!keepMsg) showMsg('');
 }
 
 function showMsg(text, kind = 'error') {
@@ -51,12 +68,13 @@ function busy(on) {
   $('#authForm').classList.toggle('busy', on);
 }
 
-function openAuth(m = 'login') {
+function openAuth(m = 'login', msg) {
   setMode(m);
+  if (msg) showMsg(msg.text, msg.kind);
   $('#menu').classList.add('hidden');
   $('#result').classList.add('hidden');
   $('#auth').classList.remove('hidden');
-  $('#authEmail').focus();
+  (m === 'recover' ? $('#authPass') : $('#authEmail')).focus();
 }
 
 function closeAuth() {
@@ -65,8 +83,7 @@ function closeAuth() {
 }
 
 function renderChip() {
-  const chip = $('#userChip');
-  chip.classList.remove('hidden');
+  $('#userChip').classList.remove('hidden');
   $('#userName').textContent = user ? displayName(user) : 'Khách';
   $('#userName').title = user?.email || '';
   const btn = $('#authBtn');
@@ -81,21 +98,25 @@ function renderChip() {
       }
       btn.disabled = false;
       store.set(false);
-      openAuth('login');
-    } else {
-      openAuth('login');
     }
+    openAuth('login');
   };
 }
+
+/** Xoá token/mã khỏi thanh địa chỉ sau khi đã dùng xong. */
+const cleanUrl = () => history.replaceState(null, '', location.pathname + location.search.replace(/[?&](code|error[^=]*)=[^&]*/g, ''));
 
 async function submit(e) {
   e.preventDefault();
   const email = $('#authEmail').value.trim();
   const password = $('#authPass').value;
   const name = $('#authName').value.trim();
-  if (!/^\S+@\S+\.\S+$/.test(email)) return showMsg('Hãy nhập email hợp lệ.');
-  if (password.length < 6) return showMsg('Mật khẩu cần tối thiểu 6 ký tự.');
+  const needEmail = MODES[mode].fields.includes('email');
+  const needPass = MODES[mode].fields.includes('pass');
+  if (needEmail && !/^\S+@\S+\.\S+$/.test(email)) return showMsg('Hãy nhập email hợp lệ.');
+  if (needPass && password.length < 6) return showMsg('Mật khẩu cần tối thiểu 6 ký tự.');
   if (mode === 'register' && (name.length < 2 || name.length > 20)) return showMsg('Tên người chơi cần từ 2 đến 20 ký tự.');
+  if (mode === 'recover' && password !== $('#authPass2').value) return showMsg('Hai mật khẩu chưa giống nhau.');
 
   busy(true);
   showMsg('');
@@ -109,6 +130,17 @@ async function submit(e) {
         showMsg(`Đã gửi email xác nhận tới ${email}. Hãy bấm link trong email rồi đăng nhập.`, 'ok');
       }
       // không cần xác nhận: onAuthChange sẽ tự đưa người chơi vào game
+    } else if (mode === 'forgot') {
+      await resetPassword(email);
+      // Không tiết lộ email có tài khoản hay không
+      showMsg(`Nếu ${email} đã có tài khoản, một email đặt lại mật khẩu vừa được gửi. Hãy kiểm tra cả thư mục Spam.`, 'ok');
+    } else if (mode === 'recover') {
+      await updatePassword(password);
+      recovering = false;
+      cleanUrl();
+      $('#authPass').value = $('#authPass2').value = '';
+      closeAuth();
+      toast('Đã đổi mật khẩu thành công!');
     } else {
       await signIn({ email, password });
     }
@@ -119,16 +151,38 @@ async function submit(e) {
   }
 }
 
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/** Link trong email quay lại trang với #...type=recovery (hoặc #error=... nếu hết hạn). */
+function readEmailLink() {
+  const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  if (p.get('type') === 'recovery' && p.get('access_token')) return { recovery: true };
+  if (p.get('error_code') || p.get('error')) {
+    const expired = /expired|invalid/i.test(`${p.get('error_code')} ${p.get('error_description')}`);
+    return { error: expired ? 'Link đã hết hạn hoặc đã được dùng. Hãy bấm "Quên mật khẩu?" để gửi lại.' : decodeURIComponent((p.get('error_description') || 'Link không hợp lệ.').replace(/\+/g, ' ')) };
+  }
+  return {};
+}
+
 /**
  * Khởi động hệ thống tài khoản. onChange(user | null) được gọi mỗi khi trạng thái đăng nhập đổi.
  * Chưa cấu hình Supabase thì không làm gì cả (game chạy như bản không có tài khoản).
  */
-export async function initAuth(onChange) {
+export async function initAuth(onChange = () => {}) {
   if (!configured) return;
-  listener = onChange;
 
   $('#tabLogin').onclick = () => setMode('login');
   $('#tabRegister').onclick = () => setMode('register');
+  $('#forgotLink').onclick = () => {
+    setMode('forgot');
+    $('#authEmail').focus();
+  };
+  $('#backLink').onclick = () => setMode('login');
   $('#authForm').addEventListener('submit', submit);
   $('#guestBtn').onclick = () => {
     store.set(true);
@@ -136,20 +190,30 @@ export async function initAuth(onChange) {
     renderChip();
   };
 
-  user = await currentUser(); // đọc phiên đã lưu → tải lại trang vẫn đăng nhập
-  renderChip();
-  if (!user && !store.get()) openAuth('login');
-  listener(user);
+  const link = readEmailLink();
+  recovering = Boolean(link.recovery);
 
-  onAuthChange((u) => {
+  // Đăng ký lắng nghe TRƯỚC khi đọc phiên để không bỏ lỡ sự kiện PASSWORD_RECOVERY
+  onAuthChange((u, event) => {
     const was = user;
     user = u;
     renderChip();
-    if (u && !was) {
+    if (event === 'PASSWORD_RECOVERY') {
+      recovering = true;
+      openAuth('recover');
+    } else if (u && !was && !recovering) {
       store.set(false);
       $('#authPass').value = '';
       closeAuth();
     }
-    listener(u);
+    onChange(u);
   });
+
+  user = await currentUser(); // đọc phiên đã lưu → tải lại trang vẫn đăng nhập
+  renderChip();
+  if (recovering) openAuth('recover');
+  else if (link.error) openAuth('login', { text: link.error, kind: 'error' });
+  else if (!user && !store.get()) openAuth('login');
+  if (link.error) cleanUrl();
+  onChange(user);
 }

@@ -34,17 +34,22 @@
         <button type="button" id="tabRegister" role="tab" aria-selected="false">Đăng ký</button>
       </div>
       <form id="authForm" novalidate>
-        <label id="nameRow" class="hidden">Tên người chơi
+        <label data-field="name" class="hidden">Tên người chơi
           <input id="authName" type="text" maxlength="20" autocomplete="nickname" placeholder="Ví dụ: Sói Con">
         </label>
-        <label>Email
+        <label data-field="email">Email
           <input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="ban@example.com">
         </label>
-        <label>Mật khẩu
+        <label data-field="pass"><span id="passLabel">Mật khẩu</span>
           <input id="authPass" type="password" autocomplete="current-password" minlength="6" placeholder="Tối thiểu 6 ký tự">
+        </label>
+        <label data-field="pass2" class="hidden">Nhập lại mật khẩu mới
+          <input id="authPass2" type="password" autocomplete="new-password" minlength="6" placeholder="Nhập lại cho chắc">
         </label>
         <p id="authMsg" class="auth-msg" role="alert"></p>
         <button id="authSubmit" class="btn-primary" type="submit">Đăng nhập</button>
+        <button id="forgotLink" class="link-btn" type="button">Quên mật khẩu?</button>
+        <button id="backLink" class="link-btn hidden" type="button">← Quay lại đăng nhập</button>
       </form>
       <button id="guestBtn" class="btn-ghost" type="button">Chơi thử không cần tài khoản</button>
     </div>

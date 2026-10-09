@@ -275,3 +275,5 @@ body.battle .user-chip { display: none; }
   .user-chip { right: 56px; top: 10px; padding: 3px 4px 3px 10px; font-size: 0.85rem; }
   .auth-panel { padding: 20px 18px 18px; }
 }
+.link-btn { display: block; width: 100%; margin-top: 12px; background: none; color: #ffe9a0; font-size: 0.9rem; text-decoration: underline; text-underline-offset: 3px; padding: 6px; }
+.link-btn:hover { color: #fff; }
