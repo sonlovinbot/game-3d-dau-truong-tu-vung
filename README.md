@@ -54,3 +54,13 @@ cd assets && npx -y @gltf-transform/cli@4 optimize hero.glb hero.web.glb --compr
 ## Âm thanh
 
 Các file trong `game sound/` lấy từ [Mixkit](https://mixkit.co/license/#sfxFree). Hãy kiểm tra giấy phép của Mixkit trước khi công khai repo hoặc phát hành game.
+
+## Tài khoản và dữ liệu (Supabase)
+
+1. Điền `.env` (xem `.env.example`) rồi chạy `node scripts/make-config.mjs` để sinh `js/config.js`.
+2. Trong Supabase → **SQL Editor**, chạy lần lượt `supabase/schema.sql` rồi `supabase/seed_words.sql`.
+3. Supabase → **Authentication → URL Configuration**: thêm `http://localhost:5290` và địa chỉ GitHub Pages vào **Redirect URLs**.
+
+`schema.sql` tạo các bảng hồ sơ, thống kê, trận đấu, tiến độ từng từ, huy hiệu và các hàm chấm điểm chạy trên server
+(`start_match` → `fetch_question` → `submit_answer`). Trình duyệt chỉ đọc được dữ liệu của chính mình và không ghi trực tiếp được vào bảng điểm.
+Sau khi sửa `js/words.js`, chạy `node scripts/make-seed.mjs` và chạy lại `seed_words.sql`.
