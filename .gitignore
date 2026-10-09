@@ -2,3 +2,6 @@
 node_modules/
 # bản sao trùng lặp của file âm thanh
 *(1).wav
+
+# khoá/cấu hình cục bộ
+.env
